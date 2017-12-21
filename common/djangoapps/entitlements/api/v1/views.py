@@ -77,7 +77,7 @@ class EntitlementViewSet(viewsets.ModelViewSet):
             enrollment
             for enrollment
             in user_run_enrollments
-            if enrollment.upgrade_deadline and enrollment.upgrade_deadline > timezone.now()
+            if enrollment.is_active and enrollment.upgrade_deadline and enrollment.upgrade_deadline > timezone.now() 
         ]
 
         # if there is only one upgradeable enrollment, convert it from audit to the entitlement.mode
