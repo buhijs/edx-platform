@@ -18,7 +18,7 @@ from edx_ace.recipient import Recipient
 from edx_ace.renderers import EmailRenderer
 from edx_ace.utils import date
 from lms.djangoapps.discussion.signals.handlers import ENABLE_FORUM_NOTIFICATIONS_FOR_SITE_KEY
-from lms.djangoapps.discussion.tasks import _should_send_message
+from lms.djangoapps.discussion.tasks import _should_send_message, _track_notification_sent
 from openedx.core.djangoapps.content.course_overviews.tests.factories import CourseOverviewFactory
 from openedx.core.djangoapps.ace_common.template_context import get_base_template_context
 from openedx.core.djangoapps.site_configuration.tests.factories import SiteConfigurationFactory
@@ -214,8 +214,7 @@ class TaskTestCase(ModuleStoreTestCase):
             self.assertEqual(expected_recipient, actual_message.recipient)
             self.assertEqual(self.course.language, actual_message.language)
             self._assert_rendered_email(actual_message)
-            with mock.patch('analytics.track') as mock_analytics_track:
-                self.assertEqual(mock_analytics_track.call_count, 1)
+
         else:
             self.assertFalse(self.mock_ace_send.called)
 
@@ -255,3 +254,41 @@ class TaskTestCase(ModuleStoreTestCase):
 
     def test_second_comment_should_not_send_email(self):
         self.run_should_not_send_email_test(self.comment2)
+
+    @ddt.data((
+        {
+            'thread_id': 'dummy_discussion_id',
+            'thread_title': 'thread-title',
+            'thread_created_at': date.serialize(NOW),
+            'course_id': 'fake_course_edx',
+            'thread_author_id': 'a_fake_dude'
+        },
+        mock.patch('edx_ace.ace.send').start(),
+        {
+            'app_label': 'discussion',
+            'name': 'responsenotification',
+            'language': 'en',
+            'uuid': 'uuid1',
+            'send_uuid': 'uuid2',
+            'thread_id': 'dummy_discussion_id',
+            'thread_created_at': NOW
+        }
+    ))
+    @ddt.unpack
+    def test_track_notification_sent(self, context, message, test_props):
+
+        # Populate mock message
+        for key, entry in test_props.items():
+            setattr(message, key, entry)
+
+        with mock.patch('analytics.track') as mock_analytics_track:
+            _track_notification_sent(message, context)
+            self.assertEqual(mock_analytics_track.call_count, 1)
+            mock_analytics_track.assert_has_calls([
+                mock.call(
+                    user_id=context['thread_author_id'],
+                    event='edx.bi.email.sent',
+                    course_id=context['course_id'],
+                    properties=test_props
+                )
+            ])

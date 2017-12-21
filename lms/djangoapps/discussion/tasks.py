@@ -60,7 +60,6 @@ def _track_notification_sent(message, context):
     Send analytics event for a sent email
     """
     properties = {
-        'site': context['site'].domain,
         'app_label': 'discussion',
         'name': 'responsenotification',  # This is 'Campaign' in GA
         'language': message.language,
@@ -72,8 +71,8 @@ def _track_notification_sent(message, context):
     analytics.track(
         user_id=context['thread_author_id'],
         event='edx.bi.email.sent',
-        properties=properties,
-        course_id=context['course_id']
+        course_id=context['course_id'],
+        properties=properties
     )
 
 
