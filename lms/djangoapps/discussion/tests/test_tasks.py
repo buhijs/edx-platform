@@ -263,7 +263,6 @@ class TaskTestCase(ModuleStoreTestCase):
             'course_id': 'fake_course_edx',
             'thread_author_id': 'a_fake_dude'
         },
-        mock.patch('edx_ace.ace.send').start(),
         {
             'app_label': 'discussion',
             'name': 'responsenotification',
@@ -275,20 +274,19 @@ class TaskTestCase(ModuleStoreTestCase):
         }
     ))
     @ddt.unpack
-    def test_track_notification_sent(self, context, message, test_props):
+    def test_track_notification_sent(self, context, test_props):
+        with mock.patch('edx_ace.ace.send').start() as message:
+            # Populate mock message
+            for key, entry in test_props.items():
+                setattr(message, key, entry)
 
-        # Populate mock message
-        for key, entry in test_props.items():
-            setattr(message, key, entry)
-
-        with mock.patch('analytics.track') as mock_analytics_track:
-            _track_notification_sent(message, context)
-            self.assertEqual(mock_analytics_track.call_count, 1)
-            mock_analytics_track.assert_has_calls([
-                mock.call(
-                    user_id=context['thread_author_id'],
-                    event='edx.bi.email.sent',
-                    course_id=context['course_id'],
-                    properties=test_props
-                )
-            ])
+            with mock.patch('analytics.track') as mock_analytics_track:
+                _track_notification_sent(message, context)
+                mock_analytics_track.assert_called_once_with([
+                    mock.call(
+                        user_id=context['thread_author_id'],
+                        event='edx.bi.email.sent',
+                        course_id=context['course_id'],
+                        properties=test_props
+                    )
+                ])
